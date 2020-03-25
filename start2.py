@@ -4,11 +4,12 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-WS = 20
+from sklearn.preprocessing import MinMaxScaler
+WS = 5
 
 # %%
-df = pd.read_csv('F:\\ut\\8\\proje\\data\\bitstampUSD_1-min_data_2012-01-01_to_2019-08-12.csv').dropna()
-len(df)
+df = pd.read_csv('F:\\ut\\8\\proje\\data\\newbit.csv').dropna()
+df = df.iloc[[x for x in range(0,20000,10)]]
 # %%
 class Bitcoin(nn.Module):
     def __init__(self,inSize, hiddenSize, outSize,ws):
@@ -17,7 +18,7 @@ class Bitcoin(nn.Module):
         self.inSize = inSize
         lstm = []
         for i,item in enumerate(hiddenSize):
-            lstm.append(nn.LSTM(inSize,hiddenSize[i]))
+            lstm.append(nn.LSTM(inSize,hiddenSize[i],num_layers=2,dropout=.2))
             inSize = hiddenSize[i]
         self.lstm = nn.ModuleList(lstm)
         self.linear = nn.Linear(hiddenSize[-1], outSize)
@@ -26,8 +27,8 @@ class Bitcoin(nn.Module):
     def reset(self):
         self.hiddenMemory =[]
         for item in self.hiddenSize:
-            self.hiddenMemory.append((torch.zeros(1,1,item).cuda(),\
-                            torch.zeros(1,1,item).cuda()))
+            self.hiddenMemory.append((torch.zeros(2,1,item).cuda(),\
+                            torch.zeros(2,1,item).cuda()))
     def forward(self,seq):
         seq=seq.view(self.ws,-1,self.inSize)
         for i,item1 in enumerate(self.hiddenMemory):
@@ -35,7 +36,7 @@ class Bitcoin(nn.Module):
         x = self.linear(seq)
         return x[-1]
 #%%
-def make_input(seq,ws,trainCol, resultCol):
+def make_input(seq,ws):
     output = []
     for item in range(len(seq) - ws):
         output.append( ((seq[item:item+ws].reshape(1,-1)[0].cuda()),\
@@ -44,66 +45,75 @@ def make_input(seq,ws,trainCol, resultCol):
 
 
 # %%
-instance = Bitcoin(1,[100,200],1,WS).cuda()
+instance = Bitcoin(1,[300,200],1,WS).cuda()
 criterion = nn.MSELoss()
-optimizer = torch.optim.Adam(instance.parameters(), lr = .01)
-torch.manual_seed(100)
+optimizer = torch.optim.Adam(instance.parameters(), lr = .001)
+torch.manual_seed(33)
 # %%
 traincol = ['Open','High','Low', 'Close', 'Volume_(Currency)', 'Weighted_Price']
 resultCol = ['Weighted_Price']
 
 #%% 
-train_set = torch.FloatTensor(np.array(df[resultCol][-1000:].values.astype(float)).reshape(-1,1))
-train_set = make_input(train_set, WS, traincol, resultCol)
-
-
+scaler = MinMaxScaler(feature_range=(-20, 20 ))
+train_set = np.array(df[resultCol][-500:-100].values.astype(float)).reshape(-1,1)
+train_set = scaler.fit_transform(train_set)
+train_set = torch.FloatTensor(train_set)
+train_set = make_input(train_set, WS)
+test = df[resultCol][-100:].values.astype(float).reshape(-1,1)
+test = scaler.fit_transform(test)
+test = torch.FloatTensor(test)
+test = make_input(test,WS)
 
 # %%
 epoch = 30
+optimizer = torch.optim.Adam(instance.parameters(), lr=.0001)
 for i in range(epoch):
-    instance.reset()
     for seq, y in train_set:
         instance.reset()
         pred = instance.forward(seq)
-        loss = criterion(y, pred)
+        loss = criterion(pred,y)
         optimizer.zero_grad()
         loss.backward(retain_graph=True)
         optimizer.step()
     print(i, loss)
 # %%
-torch.save(instance.state_dict(),'start2.pn')
+torch.save(instance.state_dict(),'start400_5.pn')
 # %%
-instance = Bitcoin(6,[100,200],1,WS)
-instance.load_state_dict(torch.load('start2.pn'))
+instance = Bitcoin(1,[100,200],1,WS)
+instance.load_state_dict(torch.load('start1000_360.pn'))
 instance = instance.cuda()
 
 # %%
-instance.eval()
+# instance.eval()
 preds = []
 real = []
-test = torch.FloatTensor(df[traincol][-5000:-WS].values.astype(float).reshape(-1,1))
-test = make_input(test,WS,traincol,resultCol)
 with torch.no_grad():
-    instance.reset()
     for item, y in test:
+        instance.reset()
+
         preds.append(instance.forward(item))
         real.append(y)
 
 
 # %%
 # torch.tensor().item()
+# print(preds)
 # preds = [torch.tensor(x).item() for x in preds]
-plt.scatter(np.linspace(10000,17000,len(preds)),preds)
-# plt.plot(range(100), preds[-100:])
+# plt.scatter(np.linspace(10000,17000,len(preds)),preds)
+plt.plot(range(94), preds[-94:],)
+# plt.show()
+plt.plot(range(94), real[-94:])
 plt.show()
 # plt.plot()
 # preds = set(preds)
 # preds = set(preds)
-# print(preds)
 # %%
 plt.plot(range(len(real)), real)
 plt.show()
 # %%
-instance.state_dict()
+instance
+
+# %%
+
 
 # %%
