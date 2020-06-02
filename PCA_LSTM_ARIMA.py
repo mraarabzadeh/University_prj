@@ -69,7 +69,9 @@ def arima_model(data):
 #%% 
 def add_indicators():
     added_columns = ['MA5','MA10','MA20', 'DIFF', 'BU', 'BL', 'Stochastic', \
-                 'ROC', 'RSI6', 'RSI12', 'ATR', 'WR5', 'WR10', 'UOS']
+                 'ROC', 'RSI6', 'RSI12', 'ATR', 'WR5', 'WR10', 'UOS'\
+                     'I30', 'I31', 'I32', 'I33', 'I34', 'I35', 'I36', \
+                      'I28', 'I29'   ]
     close = df['Close']
     df['MA5'] = close.rolling(window=5).mean()
     df['MA10'] = close.rolling(window=10).mean()
@@ -85,8 +87,18 @@ def add_indicators():
     df['WR10'] = WilliamsRIndicator(df['High'],df['Low'], close, lbp=10).wr()
     df['WR5'] = WilliamsRIndicator(df['High'],df['Low'], close, lbp=5).wr()
     df['UOS'] = UltimateOscillator(df['High'],df['Low'], close,).uo()
+    df['I28'] = close.diff(1) / close.shift(1)
+    df['I29'] = (close - df['Open']) / df['Open']
+    df['I30'] = (close - df['High']) / (df['High'] - df['Low'])
+    df['I31'] = df['MA5'].diff(1) / df['MA5'].shift(1)
+    df['I32'] = df['MA10'].diff(1) / df['MA10'].shift(1)
+    df['I33'] = df['MA20'].diff(1) / df['MA20'].shift(1)
+    df['I34'] = df['MA5'].diff(1) / df['MA20'].shift(1)
+    df['I35'] = (close - np.array([close[:x].amin() for x in range(len(close))]))/np.array([close[:x].min() for x in range(len(close))])
+    df['I36'] = (close - np.array([close[:x].amax() for x in range(len(close))]))/np.array([close[:x].max() for x in range(len(close))])
 
-    
+
+
 # %%
 instance = Bitcoin(1,[300,200],1,WS).cuda()
 criterion = nn.MSELoss()
