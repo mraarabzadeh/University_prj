@@ -8,7 +8,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from ta.trend import *
+from ta.volatility import AverageTrueRange
+from ta.momentum import UltimateOscillator, StochasticOscillator, ROCIndicator, RSIIndicator, WilliamsRIndicator
 from statsmodels.tsa.arima_model import ARIMA
 
 WS = 5
@@ -64,6 +65,28 @@ def PCA_function(data_frame, n_components):
 def arima_model(data):
     return ARIMA(data, order=(1,1,1)).fit().forecast(steps=1)[0]
 
+
+#%% 
+def add_indicators():
+    added_columns = ['MA5','MA10','MA20', 'DIFF', 'BU', 'BL', 'Stochastic', \
+                 'ROC', 'RSI6', 'RSI12', 'ATR', 'WR5', 'WR10', 'UOS']
+    close = df['Close']
+    df['MA5'] = close.rolling(window=5).mean()
+    df['MA10'] = close.rolling(window=10).mean()
+    df['MA20'] = close.rolling(window=20).mean()
+    df['DIFF'] = ta.trend.ema_indicator(close, n=12) - ta.trend.ema_indicator(close, n=26)
+    df['BL']=ta.volatility.bollinger_lband(close, n=20, ndev=2)
+    df['BU']=ta.volatility.bollinger_hband(close, n=20, ndev=2)
+    df['Stochastic']=StochasticOscillator(df['High'], df['Low'], close).stoch()
+    df['ROC'] = ROCIndicator(close).roc()
+    df['RSI6'] = RSIIndicator(close, 6).rsi()
+    df['RSI12'] = RSIIndicator(close, 12).rsi()
+    df['ATR'] = AverageTrueRange(df['High'],df['Low'], close).average_true_range() 
+    df['WR10'] = WilliamsRIndicator(df['High'],df['Low'], close, lbp=10).wr()
+    df['WR5'] = WilliamsRIndicator(df['High'],df['Low'], close, lbp=5).wr()
+    df['UOS'] = UltimateOscillator(df['High'],df['Low'], close,).uo()
+
+    
 # %%
 instance = Bitcoin(1,[300,200],1,WS).cuda()
 criterion = nn.MSELoss()
