@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
+# from skcuda.linalg import PCA as cuPCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from ta.volatility import AverageTrueRange, BollingerBands
@@ -38,18 +39,21 @@ class Bitcoin(nn.Module):
             self.hiddenMemory.append((torch.zeros(2,1,item).cuda(),\
                             torch.zeros(2,1,item).cuda()))
     def forward(self,seq):
-        seq = PCA_function(seq, self.inSize)
-        seq=seq.view(self.ws,-1,self.inSize)
+        seq=seq.view(self.ws, -1, self.inSize)
         for i,item1 in enumerate(self.hiddenMemory):
             seq ,self.hiddenMemory[i]= self.lstm[i](seq, self.hiddenMemory[i])
         x = self.linear(seq)
         return x[-1]
 #%%
-def make_input(seq,ws):
+def make_input(seq,ws, st_col=0, end_col=0):
     output = []
     for item in range(len(seq) - ws):
-        output.append( ((seq[item:item+ws].reshape(1,-1)[0].cuda()),\
-                        torch.FloatTensor(np.array(seq[item + ws:item + ws+1][-1][-1])).cuda()) )
+        if st_col == end_col == 0:
+            output.append( ((seq[item:item+ws].reshape(1,-1)[0].cuda()),\
+                            torch.FloatTensor(np.array(seq[item + ws:item + ws+1][-1][-1])).cuda()) )
+        else:
+            output.append(((torch.FloatTensor(pd.DataFrame([x[st_col:end_col] for x in seq[item:item+ws]]).values.astype(float).reshape(1,-1)[0]).cuda()),\
+                            torch.FloatTensor(np.array(seq[item + ws:item + ws+1][-1][-1])).cuda()))
     return output
 
 
@@ -97,12 +101,12 @@ def add_indicators():
     df['I34'] = df['MA5'].diff(1) / df['MA20'].shift(1)
     df['I35'] = (close - np.array([np.amin(close[:x]) for x in range(len(close))]))/np.array([np.amin(close[:x]) for x in range(len(close))])
     df['I36'] = (close - np.array([np.amax(close[:x]) for x in range(len(close))]))/np.array([np.amax(close[:x]) for x in range(len(close))])
-    df.dropna()
+    df.dropna(inplace= True)
     return added_columns
 
 
 # %%
-instance = Bitcoin(1,[300,200],1,WS).cuda()
+instance = Bitcoin(10,[300,200],1,WS).cuda()
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(instance.parameters(), lr = .001)
 torch.manual_seed(33)
@@ -110,13 +114,27 @@ torch.manual_seed(33)
 traincol = ['Open','High','Low', 'Close', 'Volume_(Currency)', 'Weighted_Price']
 resultCol = ['Weighted_Price']
 
-#%% 
-scaler = MinMaxScaler(feature_range=(-20, 20 ))
-train_set = np.array(df[resultCol][-500:-100].values.astype(float)).reshape(-1,1)
+#%%
+scaler = MinMaxScaler(feature_range=(-1, 1 ))
+add_indicators()
+new_df = np.array(PCA_function(df, 10))
+new_df=np.append(new_df, df['Close'].values.astype(float).reshape(-1,1), axis=1)
+new_df = pd.DataFrame(data=new_df)
+train_set = np.array(new_df.values.astype(float))#.reshape(-1,1)
 train_set = scaler.fit_transform(train_set)
-train_set = torch.FloatTensor(train_set)
-train_set = make_input(train_set, WS)
-test = df[resultCol][-100:].values.astype(float).reshape(-1,1)
+# train_set = torch.FloatTensor(train_set)
+
+#%% 
+scaler = MinMaxScaler(feature_range=(-1, 1 ))
+add_indicators()
+new_df = np.array(PCA_function(df, 10))
+new_df=np.append(new_df, df['Close'].values.astype(float).reshape(-1,1), axis=1)
+new_df = pd.DataFrame(data=new_df)
+train_set = np.array(new_df.values.astype(float))#.reshape(-1,1)
+train_set = scaler.fit_transform(train_set)
+# train_set = torch.FloatTensor(train_set)
+train_set = make_input(train_set, WS, st_col=0, end_col=10)
+test = df[resultCol][-100:].values.astype(float)#.reshape(-1,1)
 test = scaler.fit_transform(test)
 test = torch.FloatTensor(test)
 test = make_input(test,WS)
