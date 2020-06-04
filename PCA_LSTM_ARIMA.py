@@ -8,7 +8,8 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-from ta.volatility import AverageTrueRange
+from ta.volatility import AverageTrueRange, BollingerBands
+from ta.trend import EMAIndicator
 from ta.momentum import UltimateOscillator, StochasticOscillator, ROCIndicator, RSIIndicator, WilliamsRIndicator
 from statsmodels.tsa.arima_model import ARIMA
 
@@ -76,9 +77,9 @@ def add_indicators():
     df['MA5'] = close.rolling(window=5).mean()
     df['MA10'] = close.rolling(window=10).mean()
     df['MA20'] = close.rolling(window=20).mean()
-    df['DIFF'] = ta.trend.ema_indicator(close, n=12) - ta.trend.ema_indicator(close, n=26)
-    df['BL']=ta.volatility.bollinger_lband(close, n=20, ndev=2)
-    df['BU']=ta.volatility.bollinger_hband(close, n=20, ndev=2)
+    df['DIFF'] = EMAIndicator(close, n=12).ema_indicator() - EMAIndicator(close, n=26).ema_indicator()
+    df['BL']=BollingerBands(close, n=20, ndev=2).bollinger_lband()
+    df['BU']=BollingerBands(close, n=20, ndev=2).bollinger_hband()
     df['Stochastic']=StochasticOscillator(df['High'], df['Low'], close).stoch()
     df['ROC'] = ROCIndicator(close).roc()
     df['RSI6'] = RSIIndicator(close, 6).rsi()
@@ -94,9 +95,10 @@ def add_indicators():
     df['I32'] = df['MA10'].diff(1) / df['MA10'].shift(1)
     df['I33'] = df['MA20'].diff(1) / df['MA20'].shift(1)
     df['I34'] = df['MA5'].diff(1) / df['MA20'].shift(1)
-    df['I35'] = (close - np.array([close[:x].amin() for x in range(len(close))]))/np.array([close[:x].min() for x in range(len(close))])
-    df['I36'] = (close - np.array([close[:x].amax() for x in range(len(close))]))/np.array([close[:x].max() for x in range(len(close))])
-
+    df['I35'] = (close - np.array([np.amin(close[:x]) for x in range(len(close))]))/np.array([np.amin(close[:x]) for x in range(len(close))])
+    df['I36'] = (close - np.array([np.amax(close[:x]) for x in range(len(close))]))/np.array([np.amax(close[:x]) for x in range(len(close))])
+    df.dropna()
+    return added_columns
 
 
 # %%
