@@ -114,15 +114,6 @@ torch.manual_seed(33)
 traincol = ['Open','High','Low', 'Close', 'Volume_(Currency)', 'Weighted_Price']
 resultCol = ['Weighted_Price']
 
-#%%
-scaler = MinMaxScaler(feature_range=(-1, 1 ))
-add_indicators()
-new_df = np.array(PCA_function(df, 10))
-new_df=np.append(new_df, df['Close'].values.astype(float).reshape(-1,1), axis=1)
-new_df = pd.DataFrame(data=new_df)
-train_set = np.array(new_df.values.astype(float))#.reshape(-1,1)
-train_set = scaler.fit_transform(train_set)
-# train_set = torch.FloatTensor(train_set)
 
 #%% 
 scaler = MinMaxScaler(feature_range=(-1, 1 ))
@@ -134,14 +125,16 @@ train_set = np.array(new_df.values.astype(float))#.reshape(-1,1)
 train_set = scaler.fit_transform(train_set)
 # train_set = torch.FloatTensor(train_set)
 train_set = make_input(train_set, WS, st_col=0, end_col=10)
-test = df[resultCol][-100:].values.astype(float)#.reshape(-1,1)
-test = scaler.fit_transform(test)
-test = torch.FloatTensor(test)
-test = make_input(test,WS)
-
+# test = df[resultCol][-100:].values.astype(float)#.reshape(-1,1)
+# test = scaler.fit_transform(test)
+# test = torch.FloatTensor(test)
+# test = make_input(test,WS)
+test = train_set[-200:]
 # %%
-epoch = 30
-optimizer = torch.optim.Adam(instance.parameters(), lr=.0001)
+epoch = 200
+preds_in_learn = []
+reals_in_learn = []
+optimizer = torch.optim.Adam(instance.parameters(), lr=.000001)
 for i in range(epoch):
     for seq, y in train_set:
         instance.reset()
@@ -150,6 +143,18 @@ for i in range(epoch):
         optimizer.zero_grad()
         loss.backward(retain_graph=True)
         optimizer.step()
+    with torch.no_grad():
+        for item , y in test:
+            preds_in_learn.append(instance.forward(item))
+            reals_in_learn.append(y)
+    plt.plot(range(50), preds_in_learn[-50:],)
+    # plt.show()
+    plt.grid(color='r', linestyle='-', linewidth=.1, zorder=.1)
+    # plt.show()
+    plt.plot(range(50), reals_in_learn[-50:])
+    plt.show()
+    preds_in_learn.clear()
+    reals_in_learn.clear()
     print(i, loss)
 # %%
 torch.save(instance.state_dict(),'start400_5.pn')
